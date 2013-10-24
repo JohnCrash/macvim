@@ -1707,6 +1707,51 @@ static void netbeansReadCallback(CFSocketRef s,
                        kCFRunLoopCommonModes);
 }
 
+static void luaSocketReadCallback(CFSocketRef s,
+                                 CFSocketCallBackType callbackType,
+                                 CFDataRef address,
+                                 const void *data,
+                                 void *info)
+{
+    // luaSocket socket is readable.
+    [[MMBackend sharedInstance] messageFromluaSocket];
+}
+
+- (void)messageFromluaSocket
+{
+    [inputQueue addObject:[NSNumber numberWithInt:LuaSocketMsgID]];
+    [inputQueue addObject:[NSNull null]];
+}
+
+- (void)setLuaSocket:(int)socket
+{
+    if (luaSocket) {
+        CFRelease(luaSocket);
+        luaSocket = NULL;
+    }
+
+    if (luaSocketRunLoopSource) {
+        CFRunLoopSourceInvalidate(luaSocketRunLoopSource);
+        luaSocketRunLoopSource = NULL;
+    }
+
+    if (socket == -1)
+        return;
+
+    // Tell CFRunLoop that we are interested in NetBeans socket input.
+    luaSocket = CFSocketCreateWithNative(kCFAllocatorDefault,
+                                              socket,
+                                              kCFSocketReadCallBack,
+                                              &luaSocketReadCallback,
+                                              NULL);
+    luaSocketRunLoopSource = CFSocketCreateRunLoopSource(NULL,
+                                                        luaSocket,
+                                                        0);
+    CFRunLoopAddSource(CFRunLoopGetCurrent(),
+                       luaSocketRunLoopSource,
+                       kCFRunLoopCommonModes);
+}
+
 #ifdef FEAT_BEVAL
 - (void)setLastToolTip:(NSString *)toolTip
 {
@@ -2063,6 +2108,8 @@ static void netbeansReadCallback(CFSocketRef s,
 #ifdef FEAT_NETBEANS_INTG
         netbeans_read();
 #endif
+    } else if (LuaSocketMsgID == msgid ) {
+	lua_read_event();
     } else if (ZoomMsgID == msgid) {
         if (!data) return;
         const void *bytes = [data bytes];

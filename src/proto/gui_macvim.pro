@@ -228,6 +228,8 @@ im_set_control(int enable);
     void
 gui_macvim_set_netbeans_socket(int socket);
 
+void gui_macvim_set_luasocket(int socket);
+
     void
 gui_mch_drawsign(int row, int col, int typenr);
 

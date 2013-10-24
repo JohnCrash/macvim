@@ -8402,6 +8402,7 @@ do_sleep(msec)
 	 * call to ui_breakcheck() when the GUI is in use. This may occur when
 	 * running a test case. */
 	netbeans_parse_messages();
+	lua_parse_messages();
 #endif
     }
 }

@@ -58,6 +58,8 @@ extern NSTimeInterval MMBalloonEvalInternalDelay;
     BOOL                imState;
     CFSocketRef         netbeansSocket;
     CFRunLoopSourceRef  netbeansRunLoopSource;
+    CFSocketRef		luaSocket;
+    CFRunLoopSourceRef	luaSocketRunLoopSource;
     int                 winposX;
     int                 winposY;
 #ifdef FEAT_BEVAL
@@ -157,6 +159,7 @@ extern NSTimeInterval MMBalloonEvalInternalDelay;
 
 - (void)messageFromNetbeans;
 - (void)setNetbeansSocket:(int)socket;
+- (void)setLuaSocket:(int)socket;
 
 #ifdef FEAT_BEVAL
 - (void)setLastToolTip:(NSString *)toolTip;

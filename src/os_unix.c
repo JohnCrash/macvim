@@ -383,6 +383,7 @@ mch_inchar(buf, maxlen, wtime, tb_change_cnt)
 #ifdef FEAT_NETBEANS_INTG
     /* Process the queued netbeans messages. */
     netbeans_parse_messages();
+    lua_parse_messages();
 #endif
 
     /* Check if window changed size while we were busy, perhaps the ":set
@@ -400,6 +401,7 @@ mch_inchar(buf, maxlen, wtime, tb_change_cnt)
 #ifdef FEAT_NETBEANS_INTG
 	    /* Process the queued netbeans messages. */
 	    netbeans_parse_messages();
+	    lua_parse_messages();
 #endif
 	}
     }
@@ -434,6 +436,7 @@ mch_inchar(buf, maxlen, wtime, tb_change_cnt)
 #ifdef FEAT_NETBEANS_INTG
 	/* Process the queued netbeans messages. */
 	netbeans_parse_messages();
+	lua_parse_messages();
 #endif
 #ifndef VMS  /* VMS: must try reading, WaitForChar() does nothing. */
 	/*

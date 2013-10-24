@@ -163,7 +163,9 @@ static luaV_Dict *luaV_pushdict (lua_State *L, dict_T *dic);
 #define luaopen_package dll_luaopen_package
 #define luaopen_debug dll_luaopen_debug
 #define luaL_openlibs dll_luaL_openlibs
-
+#define luaL_ref dll_luaL_ref
+#define luaL_unref dll_luaL_unref
+#define luaL_checkudata dll_luaL_checkudata
 /* lauxlib */
 #if LUA_VERSION_NUM <= 501
 void (*dll_luaL_register) (lua_State *L, const char *libname, const luaL_Reg *l);
@@ -189,6 +191,9 @@ lua_State *(*dll_luaL_newstate) (void);
 void (*dll_luaL_buffinit) (lua_State *L, luaL_Buffer *B);
 void (*dll_luaL_addlstring) (luaL_Buffer *B, const char *s, size_t l);
 void (*dll_luaL_pushresult) (luaL_Buffer *B);
+int (*dll_luaL_ref)(lua_State *L,int t);
+void (*dll_luaL_unref)(lua_State *L,int t,int ref);
+void* (*dll_luaL_checkudata)(lua_State *L,int arg,const char* tname);
 /* lua */
 #if LUA_VERSION_NUM <= 501
 lua_Number (*dll_lua_tonumber) (lua_State *L, int idx);
@@ -249,6 +254,7 @@ int (*dll_luaopen_os) (lua_State *L);
 int (*dll_luaopen_package) (lua_State *L);
 int (*dll_luaopen_debug) (lua_State *L);
 void (*dll_luaL_openlibs) (lua_State *L);
+void (*dll_luaopen_lfs)(lua_State *L);
 
 typedef void **luaV_function;
 typedef struct {
@@ -272,6 +278,9 @@ static const luaV_Reg luaV_dll[] = {
     {"luaL_loadbufferx", (luaV_function) &dll_luaL_loadbufferx},
     {"luaL_argerror", (luaV_function) &dll_luaL_argerror},
 #endif
+    {"luaL_ref", (luaV_function) &dll_luaL_ref},
+    {"luaL_unref",(luaV_function) &dll_luaL_unref},
+    {"luaL_checkudata", (luaV_function) &dll_luaL_checkudata},
     {"luaL_checkany", (luaV_function) &dll_luaL_checkany},
     {"luaL_checklstring", (luaV_function) &dll_luaL_checklstring},
     {"luaL_checkinteger", (luaV_function) &dll_luaL_checkinteger},
@@ -339,6 +348,7 @@ static const luaV_Reg luaV_dll[] = {
     {"luaopen_os", (luaV_function) &dll_luaopen_os},
     {"luaopen_package", (luaV_function) &dll_luaopen_package},
     {"luaopen_debug", (luaV_function) &dll_luaopen_debug},
+    {"luaopen_lfs",(luaV_function)&dll_luaopen_lfs},
     {"luaL_openlibs", (luaV_function) &dll_luaL_openlibs},
     {NULL, NULL}
 };
@@ -384,7 +394,8 @@ lua_link_init(char *libname, int verbose)
     int
 lua_enabled(int verbose)
 {
-    return lua_link_init(DYNAMIC_LUA_DLL, verbose) == OK;
+   /* return lua_link_init(DYNAMIC_LUA_DLL, verbose) == OK; */
+    return lua_link_init("/usr/lib/liblua.dylib",verbose)==OK;
 }
 
 #endif /* DYNAMIC_LUA */
@@ -595,6 +606,7 @@ luaV_msgfunc(lua_State *L, msgfunc_T mf)
     luaL_pushresult(&b);
     /* break string */
     p = s = lua_tolstring(L, -1, &l);
+    msg_scroll=TRUE;
     while (l--)
     {
 	if (*p++ == '\0') /* break? */
@@ -1469,6 +1481,9 @@ luaV_type(lua_State *L)
     return 1;
 }
 
+static int luaV_vim_msg(lua_State *L);
+static int luaV_asyn_socket(lua_State *L);
+
 static const luaL_Reg luaV_module[] = {
     {"command", luaV_command},
     {"eval", luaV_eval},
@@ -1480,6 +1495,8 @@ static const luaL_Reg luaV_module[] = {
     {"window", luaV_window},
     {"open", luaV_open},
     {"type", luaV_type},
+    {"vim_msg", luaV_vim_msg},
+    {"asyn_socket", luaV_asyn_socket},
     {NULL, NULL}
 };
 
@@ -1777,6 +1794,128 @@ set_ref_in_lua (int copyID)
     luaV_getfield(L, LUAVIM_SETREF);
     lua_pushinteger(L, copyID);
     lua_call(L, 1, 0);
+}
+
+/*
+    从luaSocket auxiliar.c中拷贝而来
+ */
+/*-------------------------------------------------------------------------*\
+* Get a userdata pointer if object belongs to a given class. Return NULL 
+* otherwise
+\*-------------------------------------------------------------------------*/
+void *auxiliar_getclassudata(lua_State *L, const char *classname, int objidx) {
+    return luaL_checkudata(L, objidx, classname);
+}
+/*
+    拷贝至luaSocket tcp.h
+*/
+#ifdef WIN32
+typedef SOCKET t_socket;
+typedef t_socket *p_socket;
+#else
+typedef int t_socket;
+typedef t_socket *p_socket;
+#endif
+typedef struct t_tcp_ {
+    t_socket sock;
+    /* 后面还有很多数据,如果不引用应该没问题 */
+} t_tcp;
+
+typedef t_tcp *p_tcp;
+static int sLuaFunctionRef = LUA_REFNIL;
+static int sLuaLoopRef = LUA_REFNIL;
+void lua_parse_messages(void)
+{
+    if(sLuaLoopRef!=LUA_REFNIL)
+    {
+	lua_rawgeti(L,LUA_REGISTRYINDEX,sLuaLoopRef);
+	lua_call(L,0,0);
+    }
+}
+/*
+   当有网络数据时调用该函数
+*/
+void lua_read_event()
+{
+    if(sLuaFunctionRef!=LUA_REFNIL)
+    {
+	lua_rawgeti(L,LUA_REGISTRYINDEX,sLuaFunctionRef);
+	lua_call(L,0,0);
+    }
+}
+/*
+    设置回调入口   
+*/
+static void register_socket_receiver( t_socket sock )
+{
+#ifdef FEAT_GUI_MACVIM
+    gui_macvim_set_luasocket(sock);
+#elif defined(FEAT_GUI_W32)
+    //....
+#endif
+}
+static void unregister_socket_receiver( t_socket sock )
+{
+#ifdef FEAT_GUI_MACVIEW
+    gui_macvim_set_luasocket(-1);
+#elif defined(FEAT_GUI_W32)
+    //....
+#endif    
+}
+static int luaV_vim_msg(lua_State *L)
+{
+    if( lua_isfunction(L,1) )
+    {
+	lua_pushvalue(L,1);
+	sLuaLoopRef= luaL_ref(L,LUA_REGISTRYINDEX);
+	lua_pushboolean(L,true);
+    }
+    else
+    {
+	luaL_unref(L,LUA_REGISTRYINDEX,sLuaLoopRef);
+	sLuaLoopRef = LUA_REFNIL;
+	lua_pushnil(L);
+    }
+    return 1;
+}
+/* 异步网络模式
+   asyn_socket(socket,receiver_func)
+   当建立好一个tcp连接后,调用该函数.可以建立一种异步的接收模式
+   当有网络数据时,函数receiver_func将被调用
+ */
+static int luaV_asyn_socket(lua_State *L)
+{
+    //测试第一个参数是一个socket
+    p_tcp tcp;
+    tcp = (p_tcp) auxiliar_getclassudata(L, "tcp{client}", 1);
+    if(!tcp)
+    {
+	luaL_argerror(L,1,"arg #1 'is not socket.tcp object'");
+	return 1;
+    }
+    //测试第二个参数是一个lua函数
+    if( lua_isfunction(L,2) )
+    {
+	//这里使用引用来保存这个函数
+	lua_pushvalue(L,2);
+	sLuaFunctionRef = luaL_ref(L,LUA_REGISTRYINDEX);
+	register_socket_receiver(tcp->sock);
+	lua_pushboolean(L,true);
+    }
+    else if( lua_isnil(L,2) )
+    { //解除注册
+	if( sLuaFunctionRef != LUA_REFNIL )
+	{
+	    unregister_socket_receiver(tcp->sock);
+	    luaL_unref(L,LUA_REGISTRYINDEX,sLuaFunctionRef);
+	    sLuaFunctionRef = LUA_REFNIL;
+	}
+    }
+    else
+    {
+	luaL_argerror(L,2,"arg #2 'is not function'");
+    }
+    return 1;
 }
 
 #endif

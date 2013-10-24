@@ -106,12 +106,12 @@ nbdbg(
 {
 	va_list		 ap;
 
-	if (nb_debug != NULL && nb_dlevel & NB_TRACE) {
+	if (nb_debug != NULL && nb_dlevel & NB_TRACE) { 
 		va_start(ap, fmt);
 		vfprintf(nb_debug, fmt, ap);
 		va_end(ap);
 		fflush(nb_debug);
-	}
+	} 
 
 }    /* end nbdbg */
 

@@ -2222,6 +2222,10 @@ gui_macvim_set_netbeans_socket(int socket)
     [[MMBackend sharedInstance] setNetbeansSocket:socket];
 }
 
+void gui_macvim_set_luasocket(int socket)
+{
+    [[MMBackend sharedInstance] setLuaSocket:socket];
+}
 #endif // FEAT_NETBEANS_INTG
 
 

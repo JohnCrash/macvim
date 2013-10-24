@@ -2898,6 +2898,7 @@ gui_mch_wait_for_chars(wtime)
 #if defined(FEAT_NETBEANS_INTG)
 	/* Process any queued netbeans messages. */
 	netbeans_parse_messages();
+	lua_parse_messages();
 #endif
 
 	/*

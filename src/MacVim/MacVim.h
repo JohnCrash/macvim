@@ -184,6 +184,7 @@ enum {
     BrowseForFileMsgID,
     ShowDialogMsgID,
     NetBeansMsgID,
+    LuaSocketMsgID,
     SetMarkedTextMsgID,
     ZoomMsgID,
     SetWindowPositionMsgID,
